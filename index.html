@@ -55,6 +55,8 @@
 </section>
 <section id="result" hidden>
 <h2 id="result-title" tabindex="-1"><span id="result-code"></span> ｜ <span id="result-name"></span></h2>
+<div class="actions"><button id="share" type="button">共有</button><a id="save-image" class="save-image" download>画像を保存</a></div>
+<p id="share-status" role="status"></p><textarea id="manual" aria-label="手動共有用の文章" rows="2" readonly hidden></textarea>
 <div id="description" class="panel lilac"></div>
 <h3>4軸の割合</h3>
 <p class="muted">各軸の得点（−36〜＋36）を0〜100%に換算しています。割合は両側の合計が100%になるよう丸めています。</p>
@@ -62,8 +64,7 @@
 <details open><summary>相性の上位3タイプ（仮説）</summary>
 <p>SとMの組み合わせは＋1点、M同士は−1点。O/R・F/V・P/Hは一致ごとに＋1点。4点満点で、同点の場合はタイプコード順に表示します。得点0で両側が同じ軸は、表示上選んだ文字で比較します。実際の相性や同意は、一人ひとりとの対話で確かめてください。</p>
 <ul id="compat" class="compat"></ul></details>
-<div class="actions"><button id="browse-types" type="button">16タイプ一覧を見る</button><button id="share" type="button">共有</button><button id="edit" type="button" class="secondary">回答を見直す</button><a id="save-image" class="save-image" download>画像を保存</a></div>
-<p id="share-status" role="status"></p><textarea id="manual" aria-label="手動共有用の文章" rows="2" readonly hidden></textarea>
+<div class="actions"><button id="browse-types" type="button">16タイプ一覧を見る</button><button id="edit" type="button" class="secondary">回答を見直す</button></div>
 </section>
 <section id="type-list" hidden>
 <button id="return-result" type="button" class="secondary">結果に戻る</button>
