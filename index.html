@@ -1,0 +1,265 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; base-uri 'none'; form-action 'none'">
+<title>SM16診断 β</title>
+<style>
+:root{color-scheme:light;--ink:#292b2a;--green:#456655;--sage:#edf4ee;--purple:#66527d;--lilac:#f3eef7;--line:#d9e0db}
+*{box-sizing:border-box}body{margin:0;background:#fff;color:var(--ink);font:1rem/1.7 system-ui,sans-serif}main{max-width:740px;margin:auto;padding:24px clamp(16px,5vw,38px) 52px}header{border-bottom:1px solid var(--line);padding:4px 0 16px;color:var(--green);font-weight:750}section{margin-top:32px}h1,h2,h3{line-height:1.35}h1{font-size:clamp(2rem,7vw,3.3rem);margin:.25em 0}h2{font-size:clamp(1.45rem,4vw,2rem)}h3{font-size:1.12rem}.muted{color:#515a55}.panel,fieldset,details{padding:clamp(14px,4vw,24px);border:1px solid var(--line);border-radius:16px;margin:20px 0;min-width:0}.sage{background:var(--sage)}.lilac{background:var(--lilac)}button{font:inherit;font-weight:700;border:1px solid var(--green);border-radius:10px;background:var(--green);color:#fff;padding:9px 16px;min-height:44px;cursor:pointer}button.secondary{background:white;color:var(--green)}button:disabled{opacity:.5;cursor:default}:focus-visible{outline:3px solid var(--purple);outline-offset:3px}.actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:20px}.confirm{display:flex;gap:10px;align-items:center;min-height:44px}.confirm input{width:20px;height:20px;accent-color:var(--green)}progress{width:100%;accent-color:var(--green)}legend{font-weight:700;padding:0 4px}.scale{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px}.scale label{position:relative;display:grid;place-items:center;min-height:44px;border:1px solid var(--line);border-radius:8px;cursor:pointer}.scale input{position:absolute;opacity:0}.scale label:has(input:checked){background:var(--green);color:white;border-color:var(--green)}.scale label:has(input:focus-visible){outline:3px solid var(--purple);outline-offset:2px}.ends,.axis-labels{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap}.ends{font-size:.8rem;margin-top:8px}.bar{height:10px;border-radius:20px;overflow:hidden;background:#baa9cb}.bar span{display:block;height:100%;background:#6d8a75}.axis{margin-bottom:18px}.axis small{display:block;margin-top:4px}.compat{list-style:none;padding:0}.compat li{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;border-bottom:1px solid var(--line);padding:8px 0}.compat strong{color:var(--purple)}summary{cursor:pointer;font-weight:700}textarea{width:100%;padding:10px;font:inherit}footer{border-top:1px solid var(--line);margin-top:35px;padding-top:12px;font-size:.85rem;color:#515a55}[hidden]{display:none!important}
+@media (max-width: 520px) {
+  main { padding: 16px 16px 36px; }
+  section { margin-top: 24px; }
+  legend { max-width: 100%; overflow-wrap: anywhere; }
+  .scale { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+  .scale label { min-height: 48px; }
+  .ends { display: grid; grid-template-columns: 1fr 1fr; }
+  .ends span:last-child { text-align: right; }
+  button { min-height: 48px; }
+  .actions button { flex: 1 1 auto; }
+  .compat li { grid-template-columns: minmax(0, 1fr) auto; overflow-wrap: anywhere; }
+}
+</style>
+</head>
+<body><main>
+<header>SM16診断 β <span class="muted">／ 18歳以上</span></header>
+<noscript><p>診断にはJavaScriptが必要です。</p></noscript>
+<section id="intro">
+<h1>関係性の好みを知る</h1>
+<p>主従・従順と反抗・相手の選び方・周囲への共有。4つの軸を、48問・7段階で振り返ります。</p>
+<div class="panel sage"><strong>同意と境界線</strong><p>18歳以上の成人向けです。関係に関わる全員が自由に同意し、いつでも撤回できることを前提にしてください。拒否や中止の意思は尊重し、第三者を関わらせたり関係を明かしたりする前には、関わる人の同意を確認してください。</p>
+<label class="confirm"><input id="adult" type="checkbox">18歳以上で、上の前提を確認しました</label></div>
+<button id="start" type="button" disabled>診断を始める</button>
+</section>
+<section id="quiz" hidden>
+<h2 id="quiz-title" tabindex="-1"></h2>
+<div id="progress-label"></div><progress id="progress" max="48" value="0" aria-labelledby="progress-label"></progress>
+<p class="muted">合意のある場面を想像してお答えください。4は「どちらともいえない」です。</p>
+<div id="questions"></div>
+<p id="error" role="alert"></p>
+<div class="actions"><button id="back" type="button" class="secondary">戻る</button><button id="next" type="button">次へ</button></div>
+</section>
+<section id="result" hidden>
+<h2 id="result-title" tabindex="-1"></h2>
+<div id="description" class="panel lilac"></div>
+<h3>4軸の割合</h3>
+<p class="muted">各軸の得点（−36〜＋36）を0〜100%に換算しています。割合は両側の合計が100%になるよう丸めています。</p>
+<div id="scores"></div>
+<details open><summary>全16タイプとの相性（仮説）</summary>
+<p>主従が補完する場合に1点、O/R・F/V・P/Hは一致ごとに1点。4点満点の比較です。得点0で両側が同じ軸は、表示上選んだ文字で比較します。実際の相性や同意は、一人ひとりとの対話で確かめてください。</p>
+<ul id="compat" class="compat"></ul></details>
+<div class="actions"><button id="copy" type="button">結果をコピー</button><button id="edit" type="button" class="secondary">回答を見直す</button><button id="restart" type="button" class="secondary">最初から</button></div>
+<p id="copy-status" role="status"></p><textarea id="manual" aria-label="手動コピー用の結果" rows="6" readonly hidden></textarea>
+</section>
+<footer>回答はこのページ内で採点し、送信・保存しません。科学的に検証された心理尺度ではありません。</footer>
+</main>
+<script>
+'use strict';
+const axes = [
+  {letters:'SM', labels:['S 主導','M 委ねる'], title:'主従', prompts:[
+    '関係の流れを自分がリードするほうが心地よい。',
+    '信頼できる相手に主導権を委ねることに魅力を感じる。',
+    '相手の反応を引き出す側でいることに喜びを感じる。',
+    '相手が決めた流れに乗るほうが楽しみやすい。',
+    '合意した役割の中で、自分から方向を示したい。',
+    '自分が指示を受ける側になることに惹かれる。',
+    '二人のやり取りで、自分がペースを作る役割を好む。',
+    '相手がペースを作ってくれると、関係に入り込みやすい。',
+    '相手を導く役割を想像すると、自分にしっくりくる。',
+    '相手に導かれる役割を想像すると、自分にしっくりくる。',
+    'どちらも選べるなら、自分が主導する側を選びたい。',
+    'どちらも選べるなら、自分が委ねる側を選びたい。']},
+  {letters:'OR', labels:['O 従順','R 反抗'], title:'従順・反抗', prompts:[
+    '役割の中では、導きに素直に応じるやり取りに惹かれる。',
+    '役割の中では、合意した軽い反発があるやり取りに惹かれる。',
+    '決めた流れに自然に沿って進むほうが心地よい。',
+    '合意した範囲で流れに揺さぶりが入ると、楽しさが増す。',
+    '二人のやり取りでは、駆け引きよりも素直さを好む。',
+    '役割の中で、お互いに駆け引きを楽しめる関係を好む。',
+    '導く側と委ねる側がすんなり呼吸を合わせる関係に惹かれる。',
+    '一筋縄ではいかない相手との関係に惹かれる。',
+    '役割の雰囲気として、穏やかに足並みが揃うほうが好きだ。',
+    '役割の雰囲気として、冗談交じりの挑発があるほうが好きだ。',
+    'やり取りに役割上の反発がなくても、十分に楽しめる。',
+    '合意した演出としての反発があると、やり取りに張り合いが出る。']},
+  {letters:'FV', labels:['F 特定','V 不特定'], title:'相手の選び方', prompts:[
+    'この関係性を楽しみたいと思う相手は、特定の人に限られやすい。',
+    'お互いに納得できるなら、さまざまな相手との関係を想像できる。',
+    '関係の形そのものより、その人との結びつきに惹かれる。',
+    '相手が違っても、好みが合えば同じ関係性を楽しめそうだ。',
+    '特定の相手と積み重ねた信頼があってこそ、この役割を楽しめる。',
+    '相手との付き合いの長さにかかわらず、条件が合えば魅力を感じる。',
+    'この一面は、自分が特別だと感じる相手と分かち合いたい。',
+    'この一面を分かち合える相手は、一人に限られなくてよい。',
+    '同じ相手とやり取りを重ねることに特に魅力を感じる。',
+    '相手によって違うやり取りを知ることに魅力を感じる。',
+    '理想の関係を想像すると、関係の形より相手の個性が先に浮かぶ。',
+    '理想の関係を想像すると、相手を決める前から関係の形に惹かれる。']},
+  {letters:'PH', labels:['P 周知','H 内密'], title:'周囲への共有', prompts:[
+    'お互いの同意があれば、信頼できる第三者に関係を知ってもらいたい。',
+    '関係を二人だけのものとして保つことに特別さを感じる。',
+    '全員が同意した場で、第三者の存在を意識することに魅力を感じる。',
+    '第三者の気配がない、二人きりの場面にいちばん惹かれる。',
+    '共有範囲を二人で決めたうえで、関係について周囲に話せると嬉しい。',
+    '信頼できる友人が相手でも、関係のことは内密にしておきたい。',
+    '同意した人の間でなら、二人の役割をオープンにできると心地よい。',
+    '二人だけに通じる役割や合図を大切にしたい。',
+    '関係について、話してよい相手を二人で選べることに魅力を感じる。',
+    '周囲と共有する機会があっても、二人の中に留めておきたい。',
+    '同意した第三者に関係の一面を知ってもらうことを前向きに想像できる。',
+    '関係のことを周囲に明かさずに過ごせるほうが落ち着く。']}
+];
+const types = {
+  SOFP:'庇護者', SOFH:'飼育者', SOVP:'統率者', SOVH:'指導者',
+  SRFP:'征服者', SRFH:'調教師', SRVP:'王者', SRVH:'策士',
+  MOFP:'忠臣', MOFH:'愛玩者', MOVP:'従者', MOVH:'仮面の従者',
+  MRFP:'反逆者', MRFH:'気まぐれ猫', MRVP:'挑戦者', MRVH:'道化師'
+};
+const descriptions = [
+  ['関係の流れを自分から導く役割に惹かれる傾向があります。','信頼できる相手に流れを委ねる役割に惹かれる傾向があります。'],
+  ['素直に応じ合い、呼吸を合わせるやり取りが好みに近いかもしれません。','合意した範囲での軽い反発や駆け引きが好みに近いかもしれません。'],
+  ['特定の相手との結びつきが、関係の魅力につながりやすい傾向です。','条件や好みが合えば、相手を特定の一人に限らず関係を考えやすい傾向です。'],
+  ['合意を得た範囲で関係を共有することに魅力を感じる傾向です。','関係を内密に保つことに魅力を感じる傾向です。']
+];
+const ratings = ['まったくそう思わない','そう思わない','ややそう思わない','どちらともいえない','ややそう思う','そう思う','とてもそう思う'];
+const questions = axes.flatMap(axis => axis.prompts);
+const pageSize = 6;
+const lastPage = questions.length / pageSize - 1;
+const $ = id => document.getElementById(id);
+let answers = Array(questions.length).fill(null);
+let page = 0;
+let copyText = '';
+let copyRevision = 0;
+
+function calculate(values) {
+  return axes.map((axis, index) => axis.prompts.reduce((score, _, question) =>
+    score + (values[index * 12 + question] - 4) * (question % 2 === 0 ? 1 : -1), 0));
+}
+
+function typeCode(scores) {
+  return scores.map((score, index) => axes[index].letters[score < 0 ? 1 : 0]).join('');
+}
+
+function percentages(score) {
+  const first = Math.round((score + 36) * 100 / 72);
+  return [first, 100 - first];
+}
+
+function compatibility(code, other) {
+  return Number(code[0] !== other[0]) + [...code.slice(1)].filter((letter, index) => letter === other[index + 1]).length;
+}
+
+function show(screen, heading) {
+  for (const id of ['intro','quiz','result']) $(id).hidden = id !== screen;
+  if (heading) $(heading).focus();
+  window.scrollTo(0, 0);
+}
+
+function updateProgress() {
+  const count = answers.filter(value => value !== null).length;
+  $('progress').value = count;
+  $('progress-label').textContent = count + ' / 48問 回答済み';
+}
+
+function renderPage() {
+  const start = page * pageSize;
+  $('quiz-title').textContent = '質問 ' + (start + 1) + '〜' + (start + pageSize);
+  $('questions').innerHTML = questions.slice(start, start + pageSize).map((question, offset) => {
+    const index = start + offset;
+    const choices = ratings.map((label, position) => {
+      const value = position + 1;
+      return '<label><input type="radio" name="q' + index + '" value="' + value +
+        '" aria-label="' + value + ' ' + label + '"' + (answers[index] === value ? ' checked' : '') +
+        '><span aria-hidden="true">' + value + '</span></label>';
+    }).join('');
+    return '<fieldset><legend>' + (index + 1) + '. ' + question + '</legend><div class="scale">' +
+      choices + '</div><div class="ends" aria-hidden="true"><span>1 まったくそう思わない</span><span>7 とてもそう思う</span></div></fieldset>';
+  }).join('');
+  $('back').disabled = page === 0;
+  $('next').textContent = page === lastPage ? '結果を見る' : '次へ';
+  $('error').textContent = '';
+  updateProgress();
+  show('quiz','quiz-title');
+}
+
+function renderResult() {
+  const scores = calculate(answers);
+  const code = typeCode(scores);
+  $('result-title').textContent = code + ' ｜ ' + types[code];
+  $('description').innerHTML = '<h3>関係性の傾向</h3><p>' + scores.map((score,index) =>
+    score === 0 ? axes[index].title + 'は中間です。' : descriptions[index][score < 0 ? 1 : 0]).join('') + '</p>';
+  const lines = [];
+  $('scores').innerHTML = scores.map((score, index) => {
+    const [first, second] = percentages(score);
+    const [a,b] = axes[index].labels;
+    const note = score === 0 ? ' ／ 中間（タイプ表記では ' + axes[index].letters[0] + '）' :
+      Math.abs(score) <= 7 ? ' ／ 中間に近い' : '';
+    lines.push(a + ' ' + first + '% / ' + b + ' ' + second + '%');
+    return '<div class="axis"><div class="axis-labels"><strong>' + a + ' ' + first +
+      '%</strong><strong>' + b + ' ' + second + '%</strong></div><div class="bar" aria-hidden="true"><span style="width:' +
+      first + '%"></span></div><small>得点 ' + (score > 0 ? '+' : '') + score + note + '</small></div>';
+  }).join('');
+  $('compat').innerHTML = Object.entries(types).map(([other,name]) => ({other,name,score:compatibility(code,other)}))
+    .sort((a,b) => b.score - a.score)
+    .map(({other,name,score}) => '<li><span>' + other + '　' + name + '</span><strong>' + score + ' / 4点</strong></li>').join('');
+  copyText = ['SM16診断 β', code + ' ｜ ' + types[code], ...lines].join('\n');
+  $('copy-status').textContent = '';
+  $('manual').hidden = true;
+  show('result','result-title');
+}
+
+$('adult').addEventListener('change', event => { $('start').disabled = !event.target.checked; });
+$('start').addEventListener('click', () => { if ($('adult').checked) renderPage(); });
+$('questions').addEventListener('change', event => {
+  if (!event.target.matches('input[type="radio"]')) return;
+  answers[Number(event.target.name.slice(1))] = Number(event.target.value);
+  $('error').textContent = '';
+  updateProgress();
+});
+$('back').addEventListener('click', () => { if (page > 0) { page--; renderPage(); } });
+$('next').addEventListener('click', () => {
+  const start = page * pageSize;
+  const missing = answers.slice(start, start + pageSize).indexOf(null);
+  if (missing !== -1) {
+    $('error').textContent = '質問 ' + (start + missing + 1) + ' に回答してください。';
+    document.querySelector('[name="q' + (start + missing) + '"]').focus();
+    return;
+  }
+  if (page === lastPage) renderResult();
+  else { page++; renderPage(); }
+});
+$('edit').addEventListener('click', () => { copyRevision++; page = 0; renderPage(); });
+$('restart').addEventListener('click', () => {
+  copyRevision++;
+  answers.fill(null);
+  page = 0;
+  copyText = '';
+  $('manual').value = '';
+  $('adult').checked = false;
+  $('start').disabled = true;
+  show('intro','adult');
+});
+$('copy').addEventListener('click', async () => {
+  const revision = ++copyRevision;
+  $('manual').hidden = true;
+  try {
+    await navigator.clipboard.writeText(copyText);
+    if (revision === copyRevision) $('copy-status').textContent = '結果をコピーしました。';
+  } catch {
+    if (revision !== copyRevision) return;
+    const manual = $('manual');
+    manual.value = copyText;
+    manual.hidden = false;
+    manual.focus();
+    manual.select();
+    if (document.execCommand('copy')) {
+      manual.hidden = true;
+      $('copy').focus();
+      $('copy-status').textContent = '結果をコピーしました。';
+    } else $('copy-status').textContent = '選択した結果を端末のコピー操作でコピーしてください。';
+  }
+});
+</script>
+</body>
+</html>
