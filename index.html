@@ -298,7 +298,10 @@ function renderResult() {
   $('save-image').download = 'SM16-' + code + '.png';
   $('save-image').hidden = !imageUrl;
   imageShareData = null;
-  if (imageUrl && typeof File === 'function' && typeof navigator.share === 'function' && typeof navigator.canShare === 'function') {
+  const mobileDevice = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ||
+    (/Macintosh/i.test(navigator.userAgent) && navigator.maxTouchPoints > 1);
+  if (mobileDevice && imageUrl && typeof File === 'function' &&
+      typeof navigator.share === 'function' && typeof navigator.canShare === 'function') {
     const bytes = Uint8Array.from(atob(imageUrl.split(',')[1]), character => character.charCodeAt(0));
     const png = new File([bytes], $('save-image').download, {type:'image/png'});
     const data = {text: shareText, files: [png]};
