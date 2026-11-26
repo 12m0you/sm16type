@@ -291,7 +291,7 @@ function renderResult() {
     .slice(0, 3)
     .map(({other,name,score}) => '<li><button type="button" class="secondary compat-type" data-code="' + other +
       '">' + other + '　' + name + '</button><strong>' + score + ' / 4点</strong></li>').join('');
-  const shareText = '私は' + code + '（' + types[code] + '）でした。あなたはどのタイプ？';
+  const shareText = '私は' + code + '（' + types[code] + '）でした。あなたはどのタイプ？\nhttps://12m0you.github.io/sm16type/';
   $('share').href = 'https://x.com/intent/tweet?text=' + encodeURIComponent(shareText);
   const imageUrl = resultImage(code, scores);
   $('save-image').href = imageUrl;
