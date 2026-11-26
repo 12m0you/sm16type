@@ -24,6 +24,13 @@
 .axis.ph { --left: #afb3e3; --right: #2b2d42; }
 .axis .bar { background: var(--right); }
 .axis .bar span { background: var(--left); }
+.type-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; list-style:none; padding:0; }
+.type-card { display:grid; gap:2px; width:100%; height:100%; text-align:left; overflow-wrap:anywhere; }
+.type-card span { font-size:.82rem; }
+[data-role="S"] .type-name, .type-card[data-role="S"] { color:var(--s); }
+[data-role="M"] .type-name, .type-card[data-role="M"] { color:var(--m); }
+.compat-type { width:100%; padding:5px 0; text-align:left; border:0; text-decoration:underline; text-underline-offset:.2em; }
+.compat li { align-items:center; }
 </style>
 </head>
 <body><main>
@@ -51,10 +58,24 @@
 <p class="muted">各軸の得点（−36〜＋36）を0〜100%に換算しています。割合は両側の合計が100%になるよう丸めています。</p>
 <div id="scores"></div>
 <details open><summary>相性の上位3タイプ（仮説）</summary>
-<p>主従が補完する場合に1点、O/R・F/V・P/Hは一致ごとに1点。4点満点で、同点の場合はタイプコード順に表示します。得点0で両側が同じ軸は、表示上選んだ文字で比較します。実際の相性や同意は、一人ひとりとの対話で確かめてください。</p>
+<p>SとMの組み合わせは＋1点、M同士は−1点。O/R・F/V・P/Hは一致ごとに＋1点。4点満点で、同点の場合はタイプコード順に表示します。得点0で両側が同じ軸は、表示上選んだ文字で比較します。実際の相性や同意は、一人ひとりとの対話で確かめてください。</p>
 <ul id="compat" class="compat"></ul></details>
-<div class="actions"><button id="copy" type="button">結果をコピー</button><button id="edit" type="button" class="secondary">回答を見直す</button><button id="restart" type="button" class="secondary">最初から</button></div>
+<div class="actions"><button id="browse-types" type="button">16タイプ一覧を見る</button><button id="copy" type="button">結果をコピー</button><button id="edit" type="button" class="secondary">回答を見直す</button><button id="restart" type="button" class="secondary">最初から</button></div>
 <p id="copy-status" role="status"></p><textarea id="manual" aria-label="手動コピー用の結果" rows="6" readonly hidden></textarea>
+</section>
+<section id="type-list" hidden>
+<button id="return-result" type="button" class="secondary">結果に戻る</button>
+<h2 id="type-list-title" tabindex="-1">16タイプ一覧</h2>
+<ul id="type-grid" class="type-grid"></ul>
+</section>
+<section id="type-profile" hidden>
+<button id="return-list" type="button" class="secondary">16タイプ一覧に戻る</button>
+<h2 id="type-profile-title" tabindex="-1"><span id="profile-code"></span> ｜ <span id="profile-name" class="type-name"></span></h2>
+<div class="panel lilac">
+<h3>関係性のスタイル</h3><p id="profile-style"></p>
+<h3>相手としてできること</h3><p id="profile-play"></p>
+<h3>相手と話しておきたいこと</h3><p id="profile-talk"></p>
+</div>
 </section>
 <footer>回答はこのページ内で採点し、送信・保存しません。科学的に検証された心理尺度ではありません。</footer>
 </main>
@@ -120,6 +141,24 @@ const types = {
   MOFP:'忠臣', MOFH:'愛玩者', MOVP:'従者', MOVH:'仮面の従者',
   MRFP:'反逆者', MRFH:'気まぐれ猫', MRVP:'挑戦者', MRVH:'道化師'
 };
+const profiles = {
+  SOFP: ['選んだ相手が安心して委ねられるよう、穏やかに流れを作る関係に惹かれやすいタイプです。信頼できる人に二人の関係を知ってもらうことも、親しさの一部になりそうです。', '相手が自分で決めたいことと導いてほしいことを聞き、周囲に伝えてよい範囲を二人で決めておきましょう。', "相手がリードしてくれたら、「任せられて安心したよ」と伝えてみてください。二人で決めた範囲で、信頼できる友人に「大切な人なんだ」と紹介するのも、特別さが伝わる一言になりそうです。"],
+  SOFH: ['特定の相手との間で、素直な反応を受け取りながら落ち着いて導く関係に惹かれやすいタイプです。二人だけで通じる合図や習慣が、親しさにつながりそうです。', 'どんな合図でペースを緩めるか、二人の話を誰にどこまで共有できるかを確認しましょう。', "導いてくれたことに「君に任せられるのが嬉しい」と返してみてください。二人きりの呼び名や、「君にだけ話したかった」という小さな打ち明け話も、親しさを感じてもらえるかもしれません。"],
+  SOVP: ['相手ごとのペースを見ながら、分かりやすい流れを作ることに魅力を感じやすいタイプです。共有について合意できる環境では、役割を自然に表に出せると心地よいかもしれません。', '複数の相手と関わるなら、進め方と公開範囲を相手ごとに確認しましょう。', "提案された流れが好みに合ったら、「その進め方、好きだよ」と率直に返してみてください。少しスリルを足すなら、どんな場で二人の関係の一面を明かしてもいいか、先に相談してみましょう。"],
+  SOVH: ['相性の合う相手の反応を見ながら、落ち着いて方向を示すことに惹かれやすいタイプです。やり取りの内容は当事者同士で大事にするほうが安心できそうです。', 'どの場面で主導を任せたいかを相手に聞き、共通の知人に話せる内容を確認しましょう。', "二人きりのときに「今日はここまで任せてもいい？」と、導いてほしい範囲を具体的に伝えてみてください。終わったあと、よかった点をその人にだけ伝えるのもよさそうです。"],
+  SRFP: ['特定の相手と、遊び心のある駆け引きを交えながら自分が流れを作る関係に惹かれやすいタイプです。合意があれば関係の一部を周囲と共有することにも魅力を感じそうです。', '軽い反発を楽しめる場面と、すぐに止めてほしい合図を決めましょう。関係を誰に話すかも相談しましょう。', "軽く言い返して遊べるのが二人の好みなら、「その返し、君とだから楽しい」と伝えてみてください。周囲に見せる場面があるなら、どこまでなら楽しめそうか一緒に決めておきましょう。"],
+  SRFH: ['選んだ相手の挑発や切り返しを楽しみつつ、二人のペースを作ることに惹かれやすいタイプです。内密な関係では、信頼に支えられた駆け引きが面白さにつながりそうです。', 'どんな冗談なら楽しめるか、拒否や中止をどう伝えるかを、遊びの前に確認しましょう。', "二人きりの掛け合いが楽しかったら、「こんなやり取りができるの、君だけだよ」と伝えてみてください。二人だけで通じる合図や、ささやかな秘密を共有するのも親しさにつながりそうです。"],
+  SRVP: ['相手によって変わる反応を楽しみ、自分から展開を組み立てることに惹かれやすいタイプです。関わる人全員が望む場では、やり取りの一部をオープンにできると楽しさが広がりそうです。', '相手ごとに挑発の許容範囲を聞き、見聞きする人がいる場合は、その人の同意も確認しましょう。', "掛け合いを楽しめる相手なら、「少し言い返してもいい？」と聞いてみてください。互いに楽しく、居合わせる人も同意している場なら、人に見られる軽いスリルを楽しめるかもしれません。"],
+  SRVH: ['相手ごとに違う駆け引きを楽しみながら、二人の間で静かに主導する形に惹かれやすいタイプです。場面に合わせてやり取りを組み立てる余地があると楽しめそうです。', '演出のための反発と中止の意思を見分けられる合図を決め、やり取りを記録・共有する際の境界も確認しましょう。', "人目のないところで、「どんな切り返しなら楽しい？」と聞いてから、軽い冗談を返してみてください。あとで「あの返し、面白かった」と二人だけで振り返るのも一案です。"],
+  MOFP: ['選んだ相手の導きに素直に応え、信頼を積み重ねる関係に惹かれやすいタイプです。二人が望む範囲で関係を知ってもらえると、安心や親しさを感じるかもしれません。', '委ねたい場面と自分で決めたい場面、信頼できる人に話してよい内容を、自分の言葉で伝えておきましょう。', "素直に応えてくれたことを、「応えてくれて嬉しかった。君は特別だよ」と具体的に伝えてみてください。関係を誰かに紹介するなら、本人がどう紹介されたいか聞いてみましょう。"],
+  MOFH: ['特定の相手との静かな関係で、安心して流れを任せることに惹かれやすいタイプです。二人だけが分かる言葉や約束を大切にするかもしれません。', '気持ちが変わったときに伝えやすい合図を決め、二人のやり取りをどこまで内密にしたいかを共有しましょう。', "二人きりで「君を大事に思ってる」と伝えたり、二人だけの愛称や小さな打ち明け話を少しずつ交わしたりしてみてください。導く場面では「ここは任せてね」と穏やかに伝えると、安心しやすいかもしれません。"],
+  MOVP: ['相手を一人に限定せず、互いに合うペースで流れを任せる関係に惹かれやすいタイプです。役割について話せる範囲が明確だと、開かれた場でも参加しやすそうです。', '新しく関わる人にも、委ねられること・公開してよいことをそれぞれ伝えましょう。', "任せてもらったら、「次はこう進めてみようか」と分かりやすく伝え、気持ちよく応えてくれたことにお礼を言ってみてください。周囲に話すなら、どこまでなら心地よいか本人に聞いてみましょう。"],
+  MOVH: ['好みの合う相手と、穏やかに主導を任せるやり取りに惹かれやすいタイプです。役割を楽しむ時間と、普段の人付き合いの境界を大切にするかもしれません。', '知人の前ではどう接するか、連絡や関係の話を誰に見せてよいかを相手と確認しましょう。', "二人きりの場で「次はこうしてみようか」「このペースで大丈夫？」と声をかけてみてください。やり取りを二人の間に留める約束があると、落ち着いて委ねてもらいやすいかもしれません。"],
+  MRFP: ['特定の相手に主導を委ねながら、自分も軽い挑発や異議でやり取りに参加する形に惹かれやすいタイプです。信頼できる範囲で、二人の関係を表に出すことも楽しめそうです。', 'どこまでが遊びとしての反発かと、どんなときに周囲に関係を明かしてよいかを確認しましょう。', "軽い切り返しをお互いが楽しめるなら、遊び心を持って応じてみてください。そのあと「こうやって楽しく掛け合えるのは君だから」と愛情を言葉にすると、特別感も伝えられそうです。"],
+  MRFH: ['自分が選んだ相手に主導権を委ね、二人だけの空間で遊び心のある駆け引きを楽しむ形に惹かれやすいタイプです。相手との信頼や、関係の特別感を大切にするかもしれません。', '冗談としての反発と本気の拒否を区別できる合図を決め、二人のことを誰に話してよいか相談しましょう。', "二人きりで軽く言い返されたら、合意した範囲で余裕のある一言を返してみてください。そのあと「君だけに話したいことがある」と囁いたり、二人だけの秘密を少しずつ交わしたりするのも一案です。"],
+  MRVP: ['さまざまな相手とのやり取りで、流れを任せながら自分からも変化を加えることに惹かれやすいタイプです。合意のある開かれた場では、反応の違いも楽しめそうです。', '相手ごとに遊びのルールを決め、見ている人がいる場で試したいことは関わる全員で確認しましょう。', "「少し言い返しながら進めるほうが楽しい？」と聞いてみてください。好みが合えば、あなたが流れを作りつつ、相手の切り返しを受けて展開を変えてみるのも楽しそうです。"],
+  MRVH: ['好みが合う相手に流れを委ねつつ、冗談や切り返しで場を動かすことに惹かれやすいタイプです。周囲の目を気にせず、当事者同士だけで楽しめる関係が落ち着くかもしれません。', '笑って楽しめるやり取りと苦手な言い方を伝え、二人の間の冗談や出来事を外に持ち出す範囲も決めましょう。', "二人きりの場で、相手の冗談にひとこと返してから、「じゃあ、次はこうしようか」と流れを引き取ってみてください。あとで「あの返し、好きだった」とその人にだけ伝えるのも一案です。"]
+};
 const descriptions = [
   ['関係の流れを自分から導く役割に惹かれる傾向があります。','信頼できる相手に流れを委ねる役割に惹かれる傾向があります。'],
   ['素直に応じ合い、呼吸を合わせるやり取りが好みに近いかもしれません。','合意した範囲での軽い反発や駆け引きが好みに近いかもしれません。'],
@@ -151,11 +190,13 @@ function percentages(score) {
 }
 
 function compatibility(code, other) {
-  return Number(code[0] !== other[0]) + [...code.slice(1)].filter((letter, index) => letter === other[index + 1]).length;
+  const roleScore = Number(code[0] !== other[0]) - Number(code[0] === "M" && other[0] === "M");
+  const matches = [...code.slice(1)].filter((letter, index) => letter === other[index + 1]).length;
+  return roleScore + matches;
 }
 
 function show(screen, heading) {
-  for (const id of ['intro','quiz','result']) $(id).hidden = id !== screen;
+  for (const id of ['intro','quiz','result','type-list','type-profile']) $(id).hidden = id !== screen;
   if (heading) $(heading).focus();
   window.scrollTo(0, 0);
 }
@@ -209,7 +250,8 @@ function renderResult() {
   $('compat').innerHTML = Object.entries(types).map(([other,name]) => ({other,name,score:compatibility(code,other)}))
     .sort((a,b) => b.score - a.score || a.other.localeCompare(b.other, 'en'))
     .slice(0, 3)
-    .map(({other,name,score}) => '<li><span>' + other + '　' + name + '</span><strong>' + score + ' / 4点</strong></li>').join('');
+    .map(({other,name,score}) => '<li><button type="button" class="secondary compat-type" data-code="' + other +
+      '">' + other + '　' + name + '</button><strong>' + score + ' / 4点</strong></li>').join('');
   copyText = ['SM16診断 β', code + ' ｜ ' + types[code], ...lines].join('\n');
   $('copy-status').textContent = '';
   $('manual').hidden = true;
@@ -236,6 +278,41 @@ $('next').addEventListener('click', () => {
   if (page === lastPage) renderResult();
   else { page++; renderPage(); }
 });
+$('browse-types').addEventListener('click', () => {
+  $('type-grid').innerHTML = Object.entries(types).map(([code, name]) =>
+    '<li><button type="button" class="secondary type-card" data-code="' + code +
+    '" data-role="' + code[0] + '"><span>' + code + '</span>' + name + '</button></li>').join('');
+  show('type-list','type-list-title');
+});
+let profileReturn = null;
+
+function openProfile(event, source) {
+  const card = event.target.closest('button[data-code]');
+  if (!card) return;
+  const code = card.dataset.code;
+  profileReturn = {source, card};
+  $('return-list').textContent = source === 'result' ? '相性上位3タイプに戻る' : '16タイプ一覧に戻る';
+  const [style, talk, play] = profiles[code];
+  $('type-profile-title').dataset.role = code[0];
+  $('profile-code').textContent = code;
+  $('profile-name').textContent = types[code];
+  $('profile-style').textContent = style;
+  const stopNote = '駆け引きを楽しむ場合も、「嫌」「やめて」や迷う反応があれば、いったん止めて確認しましょう。中止を伝えるセーフワード（合図）も事前に決めておけます。';
+  $('profile-talk').textContent = code[1] === 'R' ? talk + stopNote : talk;
+  const mrPlay = '本人が「お仕置き」の演出を望むなら、どんな言葉でたしなめられると楽しいかを先に聞き、二人で決めた範囲で応じてみてください。';
+  const srPlay = '本人が「しつけ役」の演出を望むなら、どんなルールを一緒に決めたいか聞いてみてください。たしなめられる側のあなたも、楽しく受け取れる言葉や範囲を伝えておきましょう。';
+  const rolePlay = {MR: mrPlay, SR: srPlay};
+  $('profile-play').textContent = play + (rolePlay[code.slice(0,2)] || '');
+  show('type-profile','type-profile-title');
+}
+
+$('type-grid').addEventListener('click', event => openProfile(event, 'type-list'));
+$('compat').addEventListener('click', event => openProfile(event, 'result'));
+$('return-list').addEventListener('click', () => {
+  show(profileReturn.source);
+  profileReturn.card.focus();
+});
+$('return-result').addEventListener('click', () => show('result','result-title'));
 $('edit').addEventListener('click', () => { copyRevision++; page = 0; renderPage(); });
 $('restart').addEventListener('click', () => {
   copyRevision++;
