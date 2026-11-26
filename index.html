@@ -31,6 +31,8 @@
 [data-role="M"] .type-name, .type-card[data-role="M"] { color:var(--m); }
 .compat-type { width:100%; padding:5px 0; text-align:left; border:0; text-decoration:underline; text-underline-offset:.2em; }
 .compat li { align-items:center; }
+.actions .save-image { display:inline-flex; align-items:center; justify-content:center; min-height:48px; padding:9px 16px; border:1px solid var(--green); border-radius:10px; color:var(--green); font-weight:700; text-decoration:none; }
+@media (max-width:520px) { .actions .save-image { flex:1 1 auto; } }
 </style>
 </head>
 <body><main>
@@ -60,8 +62,8 @@
 <details open><summary>相性の上位3タイプ（仮説）</summary>
 <p>SとMの組み合わせは＋1点、M同士は−1点。O/R・F/V・P/Hは一致ごとに＋1点。4点満点で、同点の場合はタイプコード順に表示します。得点0で両側が同じ軸は、表示上選んだ文字で比較します。実際の相性や同意は、一人ひとりとの対話で確かめてください。</p>
 <ul id="compat" class="compat"></ul></details>
-<div class="actions"><button id="browse-types" type="button">16タイプ一覧を見る</button><button id="copy" type="button">結果をコピー</button><button id="edit" type="button" class="secondary">回答を見直す</button><button id="restart" type="button" class="secondary">最初から</button></div>
-<p id="copy-status" role="status"></p><textarea id="manual" aria-label="手動コピー用の結果" rows="6" readonly hidden></textarea>
+<div class="actions"><button id="browse-types" type="button">16タイプ一覧を見る</button><button id="share" type="button">共有</button><button id="edit" type="button" class="secondary">回答を見直す</button><a id="save-image" class="save-image" download>画像を保存</a></div>
+<p id="share-status" role="status"></p><textarea id="manual" aria-label="手動共有用の文章" rows="2" readonly hidden></textarea>
 </section>
 <section id="type-list" hidden>
 <button id="return-result" type="button" class="secondary">結果に戻る</button>
@@ -172,8 +174,9 @@ const lastPage = questions.length / pageSize - 1;
 const $ = id => document.getElementById(id);
 let answers = Array(questions.length).fill(null);
 let page = 0;
-let copyText = '';
-let copyRevision = 0;
+let shareText = '';
+let imageUrl = '';
+let shareRevision = 0;
 
 function calculate(values) {
   return axes.map((axis, index) => axis.prompts.reduce((score, _, question) =>
@@ -228,6 +231,43 @@ function renderPage() {
   show('quiz','quiz-title');
 }
 
+function resultImage(code, scores) {
+  const canvas = document.createElement('canvas');
+  canvas.width = 1600;
+  canvas.height = 1240;
+  const context = canvas.getContext('2d');
+  if (!context) return '';
+  context.scale(2, 2);
+  context.fillStyle = '#fff';
+  context.fillRect(0, 0, 800, 620);
+  context.fillStyle = '#456655';
+  context.font = '700 24px sans-serif';
+  context.fillText('SM16診断 β', 48, 62);
+  const colors = Array.from($('scores').querySelectorAll('.axis'), axis => {
+    const style = getComputedStyle(axis);
+    return [style.getPropertyValue('--left').trim(), style.getPropertyValue('--right').trim()];
+  });
+  context.fillStyle = colors[0][code[0] === 'S' ? 0 : 1];
+  context.font = '700 42px sans-serif';
+  context.fillText(code + ' ｜ ' + types[code], 48, 120);
+  scores.forEach((score, index) => {
+    const [first, second] = percentages(score);
+    const [left, right] = axes[index].labels;
+    const y = 192 + index * 96;
+    context.fillStyle = '#292b2a';
+    context.font = '700 25px sans-serif';
+    context.textAlign = 'left';
+    context.fillText(left + ' ' + first + '%', 48, y);
+    context.textAlign = 'right';
+    context.fillText(right + ' ' + second + '%', 752, y);
+    context.fillStyle = colors[index][1];
+    context.fillRect(48, y + 16, 704, 18);
+    context.fillStyle = colors[index][0];
+    context.fillRect(48, y + 16, 704 * first / 100, 18);
+  });
+  return canvas.toDataURL('image/png');
+}
+
 function renderResult() {
   const scores = calculate(answers);
   const code = typeCode(scores);
@@ -236,13 +276,11 @@ function renderResult() {
   $('result-name').textContent = types[code];
   $('description').innerHTML = '<h3>関係性の傾向</h3><p>' + scores.map((score,index) =>
     score === 0 ? axes[index].title + 'は中間です。' : descriptions[index][score < 0 ? 1 : 0]).join('') + '</p>';
-  const lines = [];
   $('scores').innerHTML = scores.map((score, index) => {
     const [first, second] = percentages(score);
     const [a,b] = axes[index].labels;
     const note = score === 0 ? ' ／ 中間（タイプ表記では ' + axes[index].letters[0] + '）' :
       Math.abs(score) <= 7 ? ' ／ 中間に近い' : '';
-    lines.push(a + ' ' + first + '% / ' + b + ' ' + second + '%');
     return '<div class="axis' + (' ' + axes[index].letters.toLowerCase()) + '"><div class="axis-labels"><strong>' + a + ' ' + first +
       '%</strong><strong>' + b + ' ' + second + '%</strong></div><div class="bar" aria-hidden="true"><span style="width:' +
       first + '%"></span></div><small>得点 ' + (score > 0 ? '+' : '') + score + note + '</small></div>';
@@ -252,8 +290,12 @@ function renderResult() {
     .slice(0, 3)
     .map(({other,name,score}) => '<li><button type="button" class="secondary compat-type" data-code="' + other +
       '">' + other + '　' + name + '</button><strong>' + score + ' / 4点</strong></li>').join('');
-  copyText = ['SM16診断 β', code + ' ｜ ' + types[code], ...lines].join('\n');
-  $('copy-status').textContent = '';
+  shareText = '私は' + code + '（' + types[code] + '）でした。あなたはどのタイプ？';
+  imageUrl = resultImage(code, scores);
+  $('save-image').href = imageUrl;
+  $('save-image').download = 'SM16-' + code + '.png';
+  $('save-image').hidden = !imageUrl;
+  $('share-status').textContent = '';
   $('manual').hidden = true;
   show('result','result-title');
 }
@@ -313,36 +355,38 @@ $('return-list').addEventListener('click', () => {
   profileReturn.card.focus();
 });
 $('return-result').addEventListener('click', () => show('result','result-title'));
-$('edit').addEventListener('click', () => { copyRevision++; page = 0; renderPage(); });
-$('restart').addEventListener('click', () => {
-  copyRevision++;
-  answers.fill(null);
-  page = 0;
-  copyText = '';
-  $('manual').value = '';
-  $('adult').checked = false;
-  $('start').disabled = true;
-  show('intro','adult');
-});
-$('copy').addEventListener('click', async () => {
-  const revision = ++copyRevision;
-  $('manual').hidden = true;
+$('edit').addEventListener('click', () => { shareRevision++; page = 0; renderPage(); });
+
+$('share').addEventListener('click', async () => {
+  const revision = ++shareRevision;
+  const manual = $('manual');
+  const status = $('share-status');
+  manual.hidden = true;
+  status.textContent = '';
   try {
-    await navigator.clipboard.writeText(copyText);
-    if (revision === copyRevision) $('copy-status').textContent = '結果をコピーしました。';
-  } catch {
-    if (revision !== copyRevision) return;
-    const manual = $('manual');
-    manual.value = copyText;
-    manual.hidden = false;
-    manual.focus();
-    manual.select();
-    if (document.execCommand('copy')) {
-      manual.hidden = true;
-      $('copy').focus();
-      $('copy-status').textContent = '結果をコピーしました。';
-    } else $('copy-status').textContent = '選択した結果を端末のコピー操作でコピーしてください。';
+    if (typeof navigator.share === 'function') {
+      const payload = {text: shareText};
+      if (imageUrl && typeof File === 'function' && typeof navigator.canShare === 'function') {
+        const bytes = Uint8Array.from(atob(imageUrl.split(',')[1]), character => character.charCodeAt(0));
+        const files = [new File([bytes], $('save-image').download, {type:'image/png'})];
+        if (navigator.canShare({files})) payload.files = files;
+      }
+      await navigator.share(payload);
+      if (revision === shareRevision && !payload.files && imageUrl) {
+        status.textContent = '画像は「画像を保存」から保存して、共有先で添付できます。';
+      }
+      return;
+    }
+  } catch (error) {
+    if (error.name === 'AbortError') return;
   }
+  if (revision !== shareRevision) return;
+  manual.value = shareText;
+  manual.hidden = false;
+  manual.focus();
+  manual.select();
+  status.textContent = imageUrl ? '文章をコピーし、「画像を保存」で保存した画像を共有先に添付してください。' :
+    '文章をコピーして共有してください。';
 });
 </script>
 </body>
