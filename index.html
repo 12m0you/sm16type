@@ -31,8 +31,9 @@
 [data-role="M"] .type-name, .type-card[data-role="M"] { color:var(--m); }
 .compat-type { width:100%; padding:5px 0; text-align:left; border:0; text-decoration:underline; text-underline-offset:.2em; }
 .compat li { align-items:center; }
-.actions .save-image { display:inline-flex; align-items:center; justify-content:center; min-height:48px; padding:9px 16px; border:1px solid var(--green); border-radius:10px; color:var(--green); font-weight:700; text-decoration:none; }
-@media (max-width:520px) { .actions .save-image { flex:1 1 auto; } }
+.actions .save-image, .actions .share-x { display:inline-flex; align-items:center; justify-content:center; min-height:48px; padding:9px 16px; border:1px solid var(--green); border-radius:10px; color:var(--green); font-weight:700; text-decoration:none; }
+.actions .share-x { background:var(--green); color:#fff; }
+@media (max-width:520px) { .actions .save-image, .actions .share-x { flex:1 1 auto; } }
 </style>
 </head>
 <body><main>
@@ -55,8 +56,8 @@
 </section>
 <section id="result" hidden>
 <h2 id="result-title" tabindex="-1"><span id="result-code"></span> ｜ <span id="result-name"></span></h2>
-<div class="actions"><button id="share" type="button">共有</button><a id="save-image" class="save-image" download>画像を保存</a></div>
-<p id="share-status" role="status"></p><textarea id="manual" aria-label="手動共有用の文章" rows="2" readonly hidden></textarea>
+<div class="actions"><a id="share" class="share-x" target="_blank" rel="noopener noreferrer">Xで共有</a><a id="save-image" class="save-image" download>画像を保存</a></div>
+<p id="share-note" class="muted" aria-live="polite" hidden><span id="share-help"></span> <a id="share-web" target="_blank" rel="noopener noreferrer" hidden>Xの投稿画面を開く</a></p>
 <div id="description" class="panel lilac"></div>
 <h3>4軸の割合</h3>
 <p class="muted">各軸の得点（−36〜＋36）を0〜100%に換算しています。割合は両側の合計が100%になるよう丸めています。</p>
@@ -175,9 +176,6 @@ const lastPage = questions.length / pageSize - 1;
 const $ = id => document.getElementById(id);
 let answers = Array(questions.length).fill(null);
 let page = 0;
-let shareText = '';
-let imageUrl = '';
-let shareRevision = 0;
 
 function calculate(values) {
   return axes.map((axis, index) => axis.prompts.reduce((score, _, question) =>
@@ -231,6 +229,8 @@ function renderPage() {
   updateProgress();
   show('quiz','quiz-title');
 }
+
+let imageShareData = null;
 
 function resultImage(code, scores) {
   const canvas = document.createElement('canvas');
@@ -291,13 +291,24 @@ function renderResult() {
     .slice(0, 3)
     .map(({other,name,score}) => '<li><button type="button" class="secondary compat-type" data-code="' + other +
       '">' + other + '　' + name + '</button><strong>' + score + ' / 4点</strong></li>').join('');
-  shareText = '私は' + code + '（' + types[code] + '）でした。あなたはどのタイプ？';
-  imageUrl = resultImage(code, scores);
+  const shareText = '私は' + code + '（' + types[code] + '）でした。あなたはどのタイプ？';
+  $('share').href = 'https://x.com/intent/tweet?text=' + encodeURIComponent(shareText);
+  const imageUrl = resultImage(code, scores);
   $('save-image').href = imageUrl;
   $('save-image').download = 'SM16-' + code + '.png';
   $('save-image').hidden = !imageUrl;
-  $('share-status').textContent = '';
-  $('manual').hidden = true;
+  imageShareData = null;
+  if (imageUrl && typeof File === 'function' && typeof navigator.share === 'function' && typeof navigator.canShare === 'function') {
+    const bytes = Uint8Array.from(atob(imageUrl.split(',')[1]), character => character.charCodeAt(0));
+    const png = new File([bytes], $('save-image').download, {type:'image/png'});
+    const data = {text: shareText, files: [png]};
+    if (navigator.canShare(data)) imageShareData = data;
+  }
+  $('share-note').hidden = !imageUrl;
+  $('share-help').textContent = imageShareData ? '共有メニューでXを選ぶと、投稿文と画像を渡せます。' :
+    '画像を添付する場合は「画像を保存」を押し、Xの投稿画面で選んでください。';
+  $('share-web').href = $('share').href;
+  $('share-web').hidden = true;
   show('result','result-title');
 }
 
@@ -356,39 +367,20 @@ $('return-list').addEventListener('click', () => {
   profileReturn.card.focus();
 });
 $('return-result').addEventListener('click', () => show('result','result-title'));
-$('edit').addEventListener('click', () => { shareRevision++; page = 0; renderPage(); });
-
-$('share').addEventListener('click', async () => {
-  const revision = ++shareRevision;
-  const manual = $('manual');
-  const status = $('share-status');
-  manual.hidden = true;
-  status.textContent = '';
+$('share').addEventListener('click', async event => {
+  const data = imageShareData;
+  if (!data || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
+  event.preventDefault();
   try {
-    if (typeof navigator.share === 'function') {
-      const payload = {text: shareText};
-      if (imageUrl && typeof File === 'function' && typeof navigator.canShare === 'function') {
-        const bytes = Uint8Array.from(atob(imageUrl.split(',')[1]), character => character.charCodeAt(0));
-        const files = [new File([bytes], $('save-image').download, {type:'image/png'})];
-        if (navigator.canShare({files})) payload.files = files;
-      }
-      await navigator.share(payload);
-      if (revision === shareRevision && !payload.files && imageUrl) {
-        status.textContent = '画像は「画像を保存」から保存して、共有先で添付できます。';
-      }
-      return;
-    }
+    await navigator.share(data);
   } catch (error) {
-    if (error.name === 'AbortError') return;
+    if (error.name === 'AbortError' || data !== imageShareData) return;
+    $('share-help').textContent = '画像の共有を開けませんでした。「画像を保存」で保存し、Xの投稿画面で添付できます。';
+    $('share-web').hidden = false;
   }
-  if (revision !== shareRevision) return;
-  manual.value = shareText;
-  manual.hidden = false;
-  manual.focus();
-  manual.select();
-  status.textContent = imageUrl ? '文章をコピーし、「画像を保存」で保存した画像を共有先に添付してください。' :
-    '文章をコピーして共有してください。';
 });
+
+$('edit').addEventListener('click', () => { page = 0; renderPage(); });
 </script>
 </body>
 </html>
